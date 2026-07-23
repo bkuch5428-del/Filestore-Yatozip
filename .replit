@@ -1,3 +1,31 @@
 modules = ["python-base-3.13"]
 [nix]
 channel = "stable-25_05"
+packages = ["cacert", "gettext"]
+
+[workflows]
+runButton = "Project"
+
+[[workflows.workflow]]
+name = "Project"
+mode = "parallel"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Start application"
+
+[[workflows.workflow]]
+name = "Start application"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = ".venv/bin/python main.py"
+
+[workflows.workflow.metadata]
+outputType = "console"
+
+[[ports]]
+localPort = 5010
+externalPort = 80
