@@ -395,7 +395,7 @@ def force_sub(func):
                         url=f"https://t.me/{bot_username}?start=verify"
                     ))
             # "I've started the bots" callback button
-            buttons.append(InlineKeyboardButton("✅ ɪ'ᴠᴇ sᴛᴀʀᴛᴇᴅ ᴛʜᴇ ʙᴏᴛs", callback_data="bverify"))
+            buttons.append(InlineKeyboardButton("✅ I have Joined", callback_data="bverify"))
 
         # Try Again URL button
         from_link = message.text.split(" ")

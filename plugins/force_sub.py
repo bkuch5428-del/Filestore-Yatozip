@@ -1,6 +1,6 @@
 from pyrogram import Client, filters
 from pyrogram.types import CallbackQuery, Message, InlineKeyboardButton, InlineKeyboardMarkup
-from helper.helper_func import is_bot_admin
+from helper.helper_func import is_bot_admin, check_bot_verification, is_bot_verification_complete
 
 #===============================================================#
 
@@ -245,14 +245,22 @@ async def botverify_mode_cmd(client: Client, message: Message):
 
 @Client.on_callback_query(filters.regex('^bverify$'))
 async def bot_verify_callback(client: Client, query: CallbackQuery):
-    """Mark all required bots as verified for the user (trust-based)."""
+    """Check whether the user has actually started all required bots before granting access."""
     user_id = query.from_user.id
     bot_verify_dict = getattr(client, 'bot_verify_dict', {})
     if not bot_verify_dict:
         return await query.answer("ɴᴏ ʙᴏᴛs ᴛᴏ ᴠᴇʀɪғʏ.", show_alert=True)
-    for bot_username in bot_verify_dict:
-        await client.mongodb.set_user_bot_verified(user_id, bot_username)
-    await query.answer(
-        "✅ ᴠᴇʀɪғɪᴇᴅ! ɴᴏᴡ ᴄʟɪᴄᴋ '🔄 Try Again' ᴛᴏ ɢᴇᴛ ʏᴏᴜʀ ғɪʟᴇs.",
-        show_alert=True
-    )
+
+    # Perform the real check — reads DB records set by the required bots themselves
+    bot_statuses = await check_bot_verification(client, user_id)
+
+    if is_bot_verification_complete(bot_statuses):
+        await query.answer(
+            "✅ ᴠᴇʀɪғɪᴇᴅ! ɴᴏᴡ ᴄʟɪᴄᴋ '🔄 Try Again' ᴛᴏ ɢᴇᴛ ʏᴏᴜʀ ғɪʟᴇs.",
+            show_alert=True
+        )
+    else:
+        await query.answer(
+            "❌ Verification failed.\n\nPlease start all required bots first, then try again.",
+            show_alert=True
+        )
