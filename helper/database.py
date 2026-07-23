@@ -762,6 +762,34 @@ class MongoDB:
             upsert=True
         )
 
+    # ✅ INDEPENDENT FSUB VERIFICATION FLAGS
+
+    async def get_channel_verify_enabled(self) -> bool:
+        """Get whether channel verification is enabled (independent flag)"""
+        data = await self.user_data.find_one({"_id": "fsub_verify_settings"})
+        return data.get("channel_verify_enabled", True) if data else True
+
+    async def set_channel_verify_enabled(self, enabled: bool):
+        """Set whether channel verification is enabled"""
+        await self.user_data.update_one(
+            {"_id": "fsub_verify_settings"},
+            {"$set": {"channel_verify_enabled": enabled}},
+            upsert=True
+        )
+
+    async def get_bot_verify_enabled(self) -> bool:
+        """Get whether bot verification is enabled (independent flag)"""
+        data = await self.user_data.find_one({"_id": "fsub_verify_settings"})
+        return data.get("bot_verify_enabled", False) if data else False
+
+    async def set_bot_verify_enabled(self, enabled: bool):
+        """Set whether bot verification is enabled"""
+        await self.user_data.update_one(
+            {"_id": "fsub_verify_settings"},
+            {"$set": {"bot_verify_enabled": enabled}},
+            upsert=True
+        )
+
     # ✅ BATCH SETTINGS FUNCTIONS
 
     async def save_all_settings(self, bot_settings: dict, messages: dict, admins: list):

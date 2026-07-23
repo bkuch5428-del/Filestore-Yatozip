@@ -92,31 +92,231 @@ async def settings_page_2(client, query):
 
 @Client.on_callback_query(filters.regex("^fsub$"))
 async def fsub(client, query):
-    # Create a formatted list of channels with names and IDs
+    """Top-level Force Subscribe Settings menu."""
+    await query.answer()
+    ch_enabled = getattr(client, 'channel_verify_enabled', True)
+    bot_enabled = getattr(client, 'bot_verify_enabled', False)
+    total_channels = len(client.fsub_dict)
+    total_bots = len(getattr(client, 'bot_verify_dict', {}))
+    msg = (
+        "<blockquote>⚙️ ꜰᴏʀᴄᴇ sᴜʙsᴄʀɪʙᴇ sᴇᴛᴛɪɴɢs</blockquote>\n\n"
+        f"›› 📢 **ᴄʜᴀɴɴᴇʟs:** `{total_channels}` — "
+        f"{'🟢 ᴠᴇʀɪғɪᴄᴀᴛɪᴏɴ ᴏɴ' if ch_enabled else '🔴 ᴠᴇʀɪғɪᴄᴀᴛɪᴏɴ ᴏꜰꜰ'}\n"
+        f"›› 🤖 **ʙᴏᴛs:** `{total_bots}` — "
+        f"{'🟢 ᴠᴇʀɪғɪᴄᴀᴛɪᴏɴ ᴏɴ' if bot_enabled else '🔴 ᴠᴇʀɪғɪᴄᴀᴛɪᴏɴ ᴏꜰꜰ'}\n\n"
+        "__sᴇʟᴇᴄᴛ ᴀ sᴇᴄᴛɪᴏɴ ᴛᴏ ᴍᴀɴᴀɢᴇ:__"
+    )
+    reply_markup = InlineKeyboardMarkup([
+        [InlineKeyboardButton('📢 ꜰsᴜʙ ᴄʜᴀɴɴᴇʟs', 'fsub_channels')],
+        [InlineKeyboardButton('🤖 ꜰsᴜʙ ʙᴏᴛs', 'fsub_bots')],
+        [InlineKeyboardButton('‹ ʙᴀᴄᴋ', 'settings')],
+    ])
+    await query.message.edit_text(msg, reply_markup=reply_markup)
+
+#===============================================================#
+
+@Client.on_callback_query(filters.regex("^fsub_channels$"))
+async def fsub_channels(client, query):
+    """FSub Channels sub-menu: manage channels + enable/disable channel verification."""
+    try:
+        await query.answer()
+    except Exception:
+        pass
     if client.fsub_dict:
         channel_list = []
         for channel_id, channel_data in client.fsub_dict.items():
             channel_name = channel_data[0] if channel_data and len(channel_data) > 0 else "Unknown"
-            request_status = "✓ ʀᴇѦᴜᴇsᴛ" if channel_data[2] else "✗ ʀᴇѦᴜᴇsᴛ"
+            request_status = "✓ ʀᴇQᴜᴇsᴛ" if channel_data[2] else "✗ ʀᴇQᴜᴇsᴛ"
             timer_status = f"ᴛɪᴍᴇʀ: {channel_data[3]}ᴍ" if channel_data[3] > 0 else "ᴛɪᴍᴇʀ: ∞"
             channel_list.append(f"• `{channel_name}` (`{channel_id}`) - {request_status}, {timer_status}")
-        
         channels_display = "\n".join(channel_list)
     else:
         channels_display = "_ɴᴏ ꜰᴏʀᴄᴇ sᴜʙsᴄʀɪᴘᴛɪᴏɴ ᴄʜᴀɴɴᴇʟs ᴄᴏɴғɪɢᴜʀᴇᴅ_"
-    
-    msg = f"""<blockquote>✦ ꜰᴏʀᴄᴇ sᴜʙsᴄʀɪᴘᴛɪᴏɴ sᴇᴛᴛɪɴɢs</blockquote>
-›› **ᴄᴏɴғɪɢᴜʀᴇᴅ ᴄʜᴀɴɴᴇʟs:**
-{channels_display}
 
-__ᴜsᴇ ᴛʜᴇ ᴀᴘᴘʀᴏᴘʀɪᴀᴛᴇ ʙᴜᴛᴛᴏɴ ʙᴇʟᴏᴡ ᴛᴏ ᴀᴅᴅ ᴏʀ ʀᴇᴍᴏᴠᴇ ᴀ ꜰᴏʀᴄᴇ sᴜʙsᴄʀɪᴘᴛɪᴏɴ ᴄʜᴀɴɴᴇʟ ʙᴀsᴇᴅ ᴏɴ ʏᴏᴜʀ ɴᴇᴇᴅs!__
-"""
-    reply_markup = InlineKeyboardMarkup([
-        [InlineKeyboardButton('›› ᴀᴅᴅ ᴄʜᴀɴɴᴇʟ', 'add_fsub'), InlineKeyboardButton('›› ʀᴇᴍᴏᴠᴇ ᴄʜᴀɴɴᴇʟ', 'rm_fsub')],
-        [InlineKeyboardButton('‹ ʙᴀᴄᴋ', 'settings')]]
+    verify_enabled = getattr(client, 'channel_verify_enabled', True)
+    status_icon = "🟢" if verify_enabled else "🔴"
+
+    msg = (
+        "<blockquote>📢 ꜰᴏʀᴄᴇ sᴜʙsᴄʀɪᴘᴛɪᴏɴ ᴄʜᴀɴɴᴇʟs</blockquote>\n"
+        f"›› **ᴄʜᴀɴɴᴇʟ ᴠᴇʀɪғɪᴄᴀᴛɪᴏɴ:** {status_icon} "
+        f"{'ᴇɴᴀʙʟᴇᴅ' if verify_enabled else 'ᴅɪsᴀʙʟᴇᴅ'}\n"
+        f"›› **ᴄᴏɴғɪɢᴜʀᴇᴅ ᴄʜᴀɴɴᴇʟs:**\n{channels_display}\n\n"
+        "__ᴜsᴇ ᴛʜᴇ ʙᴜᴛᴛᴏɴs ʙᴇʟᴏᴡ ᴛᴏ ᴍᴀɴᴀɢᴇ ꜰᴏʀᴄᴇ sᴜʙsᴄʀɪᴘᴛɪᴏɴ ᴄʜᴀɴɴᴇʟs!__"
     )
+    reply_markup = InlineKeyboardMarkup([
+        [InlineKeyboardButton('➕ ᴀᴅᴅ ᴄʜᴀɴɴᴇʟ', 'add_fsub'),
+         InlineKeyboardButton('➖ ʀᴇᴍᴏᴠᴇ ᴄʜᴀɴɴᴇʟ', 'rm_fsub')],
+        [InlineKeyboardButton('📋 ᴄʜᴀɴɴᴇʟ ʟɪsᴛ', 'fsub_channels')],
+        [InlineKeyboardButton('🟢 ᴇɴᴀʙʟᴇ ᴄʜᴀɴɴᴇʟ ᴠᴇʀɪғɪᴄᴀᴛɪᴏɴ', 'fsub_channel_enable')],
+        [InlineKeyboardButton('🔴 ᴅɪsᴀʙʟᴇ ᴄʜᴀɴɴᴇʟ ᴠᴇʀɪғɪᴄᴀᴛɪᴏɴ', 'fsub_channel_disable')],
+        [InlineKeyboardButton('‹ ʙᴀᴄᴋ', 'fsub')],
+    ])
     await query.message.edit_text(msg, reply_markup=reply_markup)
-    return
+
+#===============================================================#
+
+@Client.on_callback_query(filters.regex("^fsub_channel_enable$"))
+async def fsub_channel_enable(client, query):
+    """Enable channel verification."""
+    client.channel_verify_enabled = True
+    await client.mongodb.set_channel_verify_enabled(True)
+    await query.answer("🟢 ᴄʜᴀɴɴᴇʟ ᴠᴇʀɪғɪᴄᴀᴛɪᴏɴ ᴇɴᴀʙʟᴇᴅ!", show_alert=True)
+    await fsub_channels(client, query)
+
+#===============================================================#
+
+@Client.on_callback_query(filters.regex("^fsub_channel_disable$"))
+async def fsub_channel_disable(client, query):
+    """Disable channel verification."""
+    client.channel_verify_enabled = False
+    await client.mongodb.set_channel_verify_enabled(False)
+    await query.answer("🔴 ᴄʜᴀɴɴᴇʟ ᴠᴇʀɪғɪᴄᴀᴛɪᴏɴ ᴅɪsᴀʙʟᴇᴅ!", show_alert=True)
+    await fsub_channels(client, query)
+
+#===============================================================#
+
+@Client.on_callback_query(filters.regex("^fsub_bots$"))
+async def fsub_bots(client, query):
+    """FSub Bots sub-menu: manage bots + enable/disable bot verification."""
+    try:
+        await query.answer()
+    except Exception:
+        pass
+    bot_verify_dict = getattr(client, 'bot_verify_dict', {})
+    if bot_verify_dict:
+        bot_list_lines = [
+            f"• `{bot_name}` (@{uname})"
+            for uname, bot_name in bot_verify_dict.items()
+        ]
+        bots_display = "\n".join(bot_list_lines)
+    else:
+        bots_display = "_ɴᴏ ʙᴏᴛs ᴄᴏɴғɪɢᴜʀᴇᴅ_"
+
+    bot_enabled = getattr(client, 'bot_verify_enabled', False)
+    status_icon = "🟢" if bot_enabled else "🔴"
+
+    msg = (
+        "<blockquote>🤖 ꜰᴏʀᴄᴇ sᴜʙsᴄʀɪᴘᴛɪᴏɴ ʙᴏᴛs</blockquote>\n"
+        f"›› **ʙᴏᴛ ᴠᴇʀɪғɪᴄᴀᴛɪᴏɴ:** {status_icon} "
+        f"{'ᴇɴᴀʙʟᴇᴅ' if bot_enabled else 'ᴅɪsᴀʙʟᴇᴅ'}\n"
+        f"›› **ᴄᴏɴғɪɢᴜʀᴇᴅ ʙᴏᴛs:**\n{bots_display}\n\n"
+        "__ᴜsᴇ ᴛʜᴇ ʙᴜᴛᴛᴏɴs ʙᴇʟᴏᴡ ᴛᴏ ᴍᴀɴᴀɢᴇ ʙᴏᴛ ᴠᴇʀɪғɪᴄᴀᴛɪᴏɴ!__"
+    )
+    reply_markup = InlineKeyboardMarkup([
+        [InlineKeyboardButton('➕ ᴀᴅᴅ ʙᴏᴛ', 'fsub_add_bot'),
+         InlineKeyboardButton('➖ ʀᴇᴍᴏᴠᴇ ʙᴏᴛ', 'fsub_rm_bot')],
+        [InlineKeyboardButton('📋 ʙᴏᴛ ʟɪsᴛ', 'fsub_bots')],
+        [InlineKeyboardButton('🟢 ᴇɴᴀʙʟᴇ ʙᴏᴛ ᴠᴇʀɪғɪᴄᴀᴛɪᴏɴ', 'fsub_bot_enable')],
+        [InlineKeyboardButton('🔴 ᴅɪsᴀʙʟᴇ ʙᴏᴛ ᴠᴇʀɪғɪᴄᴀᴛɪᴏɴ', 'fsub_bot_disable')],
+        [InlineKeyboardButton('‹ ʙᴀᴄᴋ', 'fsub')],
+    ])
+    await query.message.edit_text(msg, reply_markup=reply_markup)
+
+#===============================================================#
+
+@Client.on_callback_query(filters.regex("^fsub_bot_enable$"))
+async def fsub_bot_enable(client, query):
+    """Enable bot verification."""
+    client.bot_verify_enabled = True
+    await client.mongodb.set_bot_verify_enabled(True)
+    await query.answer("🟢 ʙᴏᴛ ᴠᴇʀɪғɪᴄᴀᴛɪᴏɴ ᴇɴᴀʙʟᴇᴅ!", show_alert=True)
+    await fsub_bots(client, query)
+
+#===============================================================#
+
+@Client.on_callback_query(filters.regex("^fsub_bot_disable$"))
+async def fsub_bot_disable(client, query):
+    """Disable bot verification."""
+    client.bot_verify_enabled = False
+    await client.mongodb.set_bot_verify_enabled(False)
+    await query.answer("🔴 ʙᴏᴛ ᴠᴇʀɪғɪᴄᴀᴛɪᴏɴ ᴅɪsᴀʙʟᴇᴅ!", show_alert=True)
+    await fsub_bots(client, query)
+
+#===============================================================#
+
+@Client.on_callback_query(filters.regex("^fsub_add_bot$"))
+async def fsub_add_bot(client, query):
+    """Add a bot to the verification list via inline panel."""
+    await query.answer()
+    msg = (
+        "<blockquote>➕ ᴀᴅᴅ ʙᴏᴛ ᴛᴏ ᴠᴇʀɪғɪᴄᴀᴛɪᴏɴ ʟɪsᴛ</blockquote>\n\n"
+        "Send the **bot username** (without @) in the next 60 seconds.\n"
+        "<blockquote>Eg: `MyBot`</blockquote>"
+    )
+    await query.message.edit_text(msg)
+    try:
+        res = await client.listen(user_id=query.from_user.id, filters=filters.text, timeout=60)
+        bot_username = res.text.strip().lstrip('@')
+        if not bot_username:
+            return await query.message.edit_text(
+                "**✗ ɪɴᴠᴀʟɪᴅ ᴜsᴇʀɴᴀᴍᴇ.**",
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton('‹ ʙᴀᴄᴋ', 'fsub_bots')]])
+            )
+        if bot_username in getattr(client, 'bot_verify_dict', {}):
+            return await query.message.edit_text(
+                f"**✗ `@{bot_username}` ɪs ᴀʟʀᴇᴀᴅʏ ɪɴ ᴛʜᴇ ʟɪsᴛ!**",
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton('‹ ʙᴀᴄᴋ', 'fsub_bots')]])
+            )
+        try:
+            chat = await client.get_chat(bot_username)
+            bot_name = chat.first_name or chat.title or bot_username
+        except Exception:
+            bot_name = bot_username
+        if not hasattr(client, 'bot_verify_dict'):
+            client.bot_verify_dict = {}
+        client.bot_verify_dict[bot_username] = bot_name
+        await client.mongodb.add_bot_verify(bot_username, bot_name)
+        await query.message.edit_text(
+            f"**✓ `@{bot_username}` (`{bot_name}`) ᴀᴅᴅᴇᴅ ᴛᴏ ʙᴏᴛ ᴠᴇʀɪғɪᴄᴀᴛɪᴏɴ ʟɪsᴛ!**",
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton('‹ ʙᴀᴄᴋ', 'fsub_bots')]])
+        )
+    except Exception as e:
+        await query.message.edit_text(
+            f"**✗ ᴇʀʀᴏʀ ᴏʀ ᴛɪᴍᴇᴏᴜᴛ:** `{e}`",
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton('‹ ʙᴀᴄᴋ', 'fsub_bots')]])
+        )
+
+#===============================================================#
+
+@Client.on_callback_query(filters.regex("^fsub_rm_bot$"))
+async def fsub_rm_bot(client, query):
+    """Remove a bot from the verification list via inline panel."""
+    await query.answer()
+    bot_verify_dict = getattr(client, 'bot_verify_dict', {})
+    if not bot_verify_dict:
+        return await query.message.edit_text(
+            "**✗ ɴᴏ ʙᴏᴛs ɪɴ ᴛʜᴇ ᴠᴇʀɪғɪᴄᴀᴛɪᴏɴ ʟɪsᴛ.**",
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton('‹ ʙᴀᴄᴋ', 'fsub_bots')]])
+        )
+    bot_list_lines = [
+        f"• `{bot_name}` (@{uname})"
+        for uname, bot_name in bot_verify_dict.items()
+    ]
+    msg = (
+        "<blockquote>➖ ʀᴇᴍᴏᴠᴇ ʙᴏᴛ ꜰʀᴏᴍ ᴠᴇʀɪғɪᴄᴀᴛɪᴏɴ ʟɪsᴛ</blockquote>\n\n"
+        "**ᴄᴜʀʀᴇɴᴛ ʙᴏᴛs:**\n" + "\n".join(bot_list_lines) + "\n\n"
+        "Send the **bot username** (without @) to remove in the next 60 seconds."
+    )
+    await query.message.edit_text(msg)
+    try:
+        res = await client.listen(user_id=query.from_user.id, filters=filters.text, timeout=60)
+        bot_username = res.text.strip().lstrip('@')
+        if bot_username not in bot_verify_dict:
+            return await query.message.edit_text(
+                f"**✗ `@{bot_username}` ɪs ɴᴏᴛ ɪɴ ᴛʜᴇ ʟɪsᴛ!**",
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton('‹ ʙᴀᴄᴋ', 'fsub_bots')]])
+            )
+        client.bot_verify_dict.pop(bot_username)
+        await client.mongodb.remove_bot_verify(bot_username)
+        await query.message.edit_text(
+            f"**✓ `@{bot_username}` ʀᴇᴍᴏᴠᴇᴅ ꜰʀᴏᴍ ʙᴏᴛ ᴠᴇʀɪғɪᴄᴀᴛɪᴏɴ ʟɪsᴛ!**",
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton('‹ ʙᴀᴄᴋ', 'fsub_bots')]])
+        )
+    except Exception as e:
+        await query.message.edit_text(
+            f"**✗ ᴇʀʀᴏʀ ᴏʀ ᴛɪᴍᴇᴏᴜᴛ:** `{e}`",
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton('‹ ʙᴀᴄᴋ', 'fsub_bots')]])
+        )
 
 #===============================================================#
 

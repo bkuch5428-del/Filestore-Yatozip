@@ -44,7 +44,9 @@ class Bot(Client):
         self.db_channels = {}  # Initialize DB channels dictionary
         self.primary_db_channel = db  # Set initial primary DB channel
         self.bot_verify_dict = {}  # {bot_username: bot_name}
-        self.botverify_mode = "channel_only"  # channel_only | bot_only | channel_bot
+        self.botverify_mode = "channel_only"  # channel_only | bot_only | channel_bot (legacy)
+        self.channel_verify_enabled = True   # independent channel verification flag
+        self.bot_verify_enabled = False      # independent bot verification flag
     
     async def start(self):
         await super().start()
@@ -133,6 +135,13 @@ class Bot(Client):
             self.botverify_mode = await self.mongodb.get_botverify_mode()
         except Exception as e:
             self.LOGGER(__name__, self.name).warning(f"Error loading bot verify settings: {e}")
+
+        # Load independent FSub verification flags
+        try:
+            self.channel_verify_enabled = await self.mongodb.get_channel_verify_enabled()
+            self.bot_verify_enabled = await self.mongodb.get_bot_verify_enabled()
+        except Exception as e:
+            self.LOGGER(__name__, self.name).warning(f"Error loading fsub verify flags: {e}")
 
         # Load shortner settings from database
         try:

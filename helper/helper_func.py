@@ -318,12 +318,9 @@ def is_bot_verification_complete(bot_statuses):
 def force_sub(func):
     """Decorator to enforce force subscription and/or bot verification before executing a command."""
     async def wrapper(client: Client, message: Message):
-        mode = getattr(client, 'botverify_mode', 'channel_only')
-        has_channels = bool(client.fsub_dict)
-        has_bots = bool(getattr(client, 'bot_verify_dict', {}))
-
-        check_channels = mode in ('channel_only', 'channel_bot') and has_channels
-        check_bots = mode in ('bot_only', 'channel_bot') and has_bots
+        # Use independent verification flags (new system)
+        check_channels = getattr(client, 'channel_verify_enabled', True) and bool(client.fsub_dict)
+        check_bots = getattr(client, 'bot_verify_enabled', False) and bool(getattr(client, 'bot_verify_dict', {}))
 
         # Nothing to verify — proceed immediately
         if not check_channels and not check_bots:
