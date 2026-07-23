@@ -8,3 +8,14 @@ markdown
 asyncio
 TgCrypto
 requests
+aiohttp
+asyncio
+dnspython
+humanize
+markdown
+motor
+psutil
+pyrofork==2.3.50
+pyrogram
+requests
+TgCrypto
