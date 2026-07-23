@@ -392,7 +392,7 @@ def force_sub(func):
                 if not bot_statuses.get(bot_username, False):
                     buttons.append(InlineKeyboardButton(
                         f"🤖 {bot_name}",
-                        url=f"https://t.me/{bot_username}?start=verify"
+                        url=f"https://t.me/{client.username}?start=botv_{bot_username}"
                     ))
             # "I've started the bots" callback button
             buttons.append(InlineKeyboardButton("✅ I have Joined", callback_data="bverify"))

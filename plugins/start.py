@@ -9,6 +9,51 @@ import asyncio
 
 #===============================================================#
 
+def _is_botv_payload(_, __, message):
+    """Custom filter: matches /start botv_<username> deep-links only."""
+    if not message.text:
+        return False
+    parts = message.text.split(None, 1)
+    if len(parts) < 2:
+        return False
+    cmd = parts[0].split('@')[0]  # strip @BotUsername suffix if present
+    return cmd == '/start' and parts[1].strip().startswith('botv_')
+
+_botv_filter = filters.create(_is_botv_payload)
+
+@Client.on_message(filters.private & _botv_filter)
+async def bot_verify_start(client: Client, message: Message):
+    """
+    Handles /start botv_<bot_username> deep-links.
+
+    When a user clicks a required-bot button in the verification panel they are
+    sent here (not to the external bot). This handler writes a verified record
+    to the 'bot_verify' MongoDB collection so that check_bot_verification()
+    can confirm it when the user presses ✅ I have Joined.
+
+    No @force_sub here intentionally: the user must be able to register their
+    bot starts even before passing channel verification.
+    """
+    payload = message.text.split(None, 1)[1].strip()   # e.g. "botv_SomeBot"
+    bot_username = payload[len('botv_'):]               # e.g. "SomeBot"
+    user_id = message.from_user.id
+
+    bot_verify_dict = getattr(client, 'bot_verify_dict', {})
+    if bot_username not in bot_verify_dict:
+        # Not a recognised required bot — let Pyrogram fall through to start_command
+        return
+
+    # Write verification record to the shared 'bot_verify' collection
+    await client.mongodb.set_user_bot_verified(user_id, bot_username)
+    bot_name = bot_verify_dict[bot_username]
+
+    await message.reply(
+        f"✅ **{bot_name}** verified!\n\n"
+        f"Go back and press **✅ I have Joined** to complete verification."
+    )
+
+#===============================================================#
+
 @Client.on_message(filters.command('start') & filters.private)
 @force_sub
 async def start_command(client: Client, message: Message):
