@@ -299,89 +299,122 @@ def is_user_subscribed(statuses):
 
 #===============================================================#
 
+async def check_bot_verification(client, user_id):
+    """Check if user has verified all required bots."""
+    bot_statuses = {}
+    for bot_username, bot_name in getattr(client, 'bot_verify_dict', {}).items():
+        verified = await client.mongodb.is_user_bot_verified(user_id, bot_username)
+        bot_statuses[bot_username] = verified
+    return bot_statuses
+
+def is_bot_verification_complete(bot_statuses):
+    """Check if user has verified all bots."""
+    if not bot_statuses:
+        return True
+    return all(bot_statuses.values())
+
+#===============================================================#
+
 def force_sub(func):
-    """Decorator to enforce force subscription before executing a command."""
+    """Decorator to enforce force subscription and/or bot verification before executing a command."""
     async def wrapper(client: Client, message: Message):
-        if not client.fsub_dict:
+        mode = getattr(client, 'botverify_mode', 'channel_only')
+        has_channels = bool(client.fsub_dict)
+        has_bots = bool(getattr(client, 'bot_verify_dict', {}))
+
+        check_channels = mode in ('channel_only', 'channel_bot') and has_channels
+        check_bots = mode in ('bot_only', 'channel_bot') and has_bots
+
+        # Nothing to verify — proceed immediately
+        if not check_channels and not check_bots:
             return await func(client, message)
+
         photo = client.messages.get('FSUB_PHOTO', '')
         if photo:
             msg = await message.reply_photo(
-                caption="<b>ᴡᴀɪᴛ ᴀ sᴇᴄᴏɴᴅ.....</b>", 
+                caption="<b>ᴡᴀɪᴛ ᴀ sᴇᴄᴏɴᴅ.....</b>",
                 photo=photo
             )
         else:
             msg = await message.reply(
                 "<code><b>ᴡᴀɪᴛ ᴀ sᴇᴄᴏɴᴅ.....</b></code>"
             )
-        user_id = message.from_user.id
-        statuses = await check_subscription(client, user_id)
 
-        if is_user_subscribed(statuses):
+        user_id = message.from_user.id
+
+        # Check channels
+        channel_ok = True
+        statuses = {}
+        if check_channels:
+            statuses = await check_subscription(client, user_id)
+            channel_ok = is_user_subscribed(statuses)
+
+        # Check bots
+        bot_ok = True
+        bot_statuses = {}
+        if check_bots:
+            bot_statuses = await check_bot_verification(client, user_id)
+            bot_ok = is_bot_verification_complete(bot_statuses)
+
+        if channel_ok and bot_ok:
             await msg.delete()
             return await func(client, message)
 
-        # User is not subscribed to all channels
+        # Build unified verification panel
         buttons = []
-        channels_message = f"{client.messages.get('FSUB', '')}\n\n"
+        panel_text = f"{client.messages.get('FSUB', '')}\n\n"
 
-        for channel_id, (channel_name, channel_link, request, timer) in client.fsub_dict.items():
-            status = statuses.get(channel_id, None)
-
-            # Generate invite link if needed
-            if timer > 0:
-                expire_time = datetime.now() + timedelta(minutes=timer)
-                try:
-                    invite = await client.create_chat_invite_link(
-                        chat_id=channel_id,
-                        expire_date=expire_time,
-                        creates_join_request=request
-                    )
-                    channel_link = invite.invite_link
-                except Exception as e:
-                    client.LOGGER(__name__, client.name).warning(f"Error creating invite link for {channel_name}: {e}")
-
-            # Add button based on user status
-            if status not in {ChatMemberStatus.MEMBER, ChatMemberStatus.ADMINISTRATOR, ChatMemberStatus.OWNER}:
-                # Check if user has already submitted request for request channels
+        # Channel buttons (only for unsubscribed channels)
+        if check_channels:
+            for channel_id, (channel_name, channel_link, request, timer) in client.fsub_dict.items():
+                status = statuses.get(channel_id, None)
+                if status in {ChatMemberStatus.MEMBER, ChatMemberStatus.ADMINISTRATOR, ChatMemberStatus.OWNER}:
+                    continue
+                # Generate timed invite link if configured
+                if timer > 0:
+                    expire_time = datetime.now() + timedelta(minutes=timer)
+                    try:
+                        invite = await client.create_chat_invite_link(
+                            chat_id=channel_id,
+                            expire_date=expire_time,
+                            creates_join_request=request
+                        )
+                        channel_link = invite.invite_link
+                    except Exception as e:
+                        client.LOGGER(__name__, client.name).warning(f"Error creating invite link for {channel_name}: {e}")
+                # Skip pending join requests
                 if request and await client.mongodb.has_submitted_join_request(user_id, channel_id):
-                    request_status = await client.mongodb.get_join_request_status(user_id, channel_id)
-                    if request_status == "pending":
-                        # Don't add button if request is still pending
+                    req_status = await client.mongodb.get_join_request_status(user_id, channel_id)
+                    if req_status == "pending":
                         continue
-                    elif request_status == "approved":
-                        # User can now join the channel
-                        button_text = f"{channel_name}"
-                    else:
-                        button_text = f"{channel_name}"
-                else:
-                    # User hasn't submitted request or it's a regular channel
-                    if request:
-                        button_text = f"{channel_name}"
-                    else:
-                        button_text = f"{channel_name}"
-                
-                buttons.append(InlineKeyboardButton(button_text, url=channel_link))
+                buttons.append(InlineKeyboardButton(channel_name, url=channel_link))
 
-        # Add "Try Again" button if needed
+        # Bot buttons (only for unverified bots)
+        if check_bots:
+            for bot_username, bot_name in client.bot_verify_dict.items():
+                if not bot_statuses.get(bot_username, False):
+                    buttons.append(InlineKeyboardButton(
+                        f"🤖 {bot_name}",
+                        url=f"https://t.me/{bot_username}?start=verify"
+                    ))
+            # "I've started the bots" callback button
+            buttons.append(InlineKeyboardButton("✅ ɪ'ᴠᴇ sᴛᴀʀᴛᴇᴅ ᴛʜᴇ ʙᴏᴛs", callback_data="bverify"))
+
+        # Try Again URL button
         from_link = message.text.split(" ")
         if len(from_link) > 1:
             try_again_link = f"https://t.me/{client.username}/?start={from_link[1]}"
             buttons.append(InlineKeyboardButton("🔄 Try Again", url=try_again_link))
 
-        # Organize buttons in rows of 1 for better readability
-        buttons_markup = InlineKeyboardMarkup([[button] for button in buttons])
-        buttons_markup = None if not buttons else buttons_markup
+        buttons_markup = InlineKeyboardMarkup([[b] for b in buttons]) if buttons else None
 
-        # Edit message with status update and buttons
         try:
-            await msg.edit_text(text=channels_message, reply_markup=buttons_markup)
+            await msg.edit_text(text=panel_text, reply_markup=buttons_markup)
         except Exception as e:
-            client.LOGGER(__name__, client.name).warning(f"Error updating force sub message: {e}")
-            # Fallback: send new message if edit fails
+            client.LOGGER(__name__, client.name).warning(f"Error updating verification panel: {e}")
             try:
                 await msg.delete()
-                await message.reply(text=channels_message, reply_markup=buttons_markup)
+                await message.reply(text=panel_text, reply_markup=buttons_markup)
             except Exception:
                 pass
 

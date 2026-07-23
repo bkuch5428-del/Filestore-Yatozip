@@ -14,6 +14,7 @@ class MongoDB:
             instance.premium_users = instance.db['pros']
             instance.fsub_status = instance.db['fsub_status']  # New collection for fsub status tracking
             instance.request_sub = instance.db['request_sub']  # New collection for join request tracking
+            instance.bot_verify = instance.db['bot_verify']  # Bot verification collection
             cls._instances[(uri, db_name)] = instance
         return cls._instances[(uri, db_name)]
 
@@ -705,6 +706,61 @@ class MongoDB:
             await self.set_admins_list(current_admins)
             return True
         return False
+
+    # ✅ BOT VERIFICATION FUNCTIONS
+
+    async def get_bot_verify_list(self) -> dict:
+        """Get list of bots users must verify (bot_username -> bot_name)"""
+        data = await self.user_data.find_one({"_id": "bot_verify_list"})
+        return data.get("bots", {}) if data else {}
+
+    async def add_bot_verify(self, bot_username: str, bot_name: str):
+        """Add a bot to the verify list"""
+        current = await self.get_bot_verify_list()
+        current[bot_username] = bot_name
+        await self.user_data.update_one(
+            {"_id": "bot_verify_list"},
+            {"$set": {"bots": current}},
+            upsert=True
+        )
+
+    async def remove_bot_verify(self, bot_username: str):
+        """Remove a bot from the verify list"""
+        current = await self.get_bot_verify_list()
+        current.pop(bot_username, None)
+        await self.user_data.update_one(
+            {"_id": "bot_verify_list"},
+            {"$set": {"bots": current}},
+            upsert=True
+        )
+
+    async def is_user_bot_verified(self, user_id: int, bot_username: str) -> bool:
+        """Check if user has verified for a specific bot"""
+        doc = await self.bot_verify.find_one(
+            {"user_id": user_id, "bot_username": bot_username, "verified": True}
+        )
+        return doc is not None
+
+    async def set_user_bot_verified(self, user_id: int, bot_username: str):
+        """Mark user as verified for a bot"""
+        await self.bot_verify.update_one(
+            {"user_id": user_id, "bot_username": bot_username},
+            {"$set": {"verified": True, "verified_at": datetime.now()}},
+            upsert=True
+        )
+
+    async def get_botverify_mode(self) -> str:
+        """Get bot verify mode: channel_only | bot_only | channel_bot"""
+        data = await self.user_data.find_one({"_id": "bot_verify_settings"})
+        return data.get("mode", "channel_only") if data else "channel_only"
+
+    async def set_botverify_mode(self, mode: str):
+        """Set bot verify mode"""
+        await self.user_data.update_one(
+            {"_id": "bot_verify_settings"},
+            {"$set": {"mode": mode}},
+            upsert=True
+        )
 
     # ✅ BATCH SETTINGS FUNCTIONS
 

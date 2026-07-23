@@ -42,6 +42,8 @@ class Bot(Client):
         self.req_channels = []
         self.db_channels = {}  # Initialize DB channels dictionary
         self.primary_db_channel = db  # Set initial primary DB channel
+        self.bot_verify_dict = {}  # {bot_username: bot_name}
+        self.botverify_mode = "channel_only"  # channel_only | bot_only | channel_bot
     
     async def start(self):
         await super().start()
@@ -124,6 +126,13 @@ class Bot(Client):
         except Exception as e:
             self.LOGGER(__name__, self.name).warning(f"Error loading DB channels: {e}")
         
+        # Load bot verification settings from database
+        try:
+            self.bot_verify_dict = await self.mongodb.get_bot_verify_list()
+            self.botverify_mode = await self.mongodb.get_botverify_mode()
+        except Exception as e:
+            self.LOGGER(__name__, self.name).warning(f"Error loading bot verify settings: {e}")
+
         # Load shortner settings from database
         try:
             shortner_settings = await self.mongodb.get_shortner_settings()

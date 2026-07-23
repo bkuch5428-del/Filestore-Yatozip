@@ -103,3 +103,128 @@ async def rm_fsub(client: Client, query: CallbackQuery):
         return await ask_channel_info.reply(f"__Channel with id: `{channel_id}` has been removed as a force sub channel!!__")
     except Exception as e:
         return await ask_channel_info.reply(f"**Error:** `{e}`")
+
+#===============================================================#
+# Bot Verification Commands
+#===============================================================#
+
+VALID_MODES = {
+    "channel_only": "ᴄʜᴀɴɴᴇʟ ᴏɴʟʏ",
+    "bot_only":     "ʙᴏᴛ ᴏɴʟʏ",
+    "channel_bot":  "ᴄʜᴀɴɴᴇʟ + ʙᴏᴛ",
+}
+
+@Client.on_message(filters.command('addbot') & filters.private)
+async def addbot_cmd(client: Client, message: Message):
+    if message.from_user.id not in client.admins:
+        return await message.reply("**✗ ᴏɴʟʏ ᴀᴅᴍɪɴs ᴄᴀɴ ᴜsᴇ ᴛʜɪs!**")
+    ask = await client.ask(
+        message.from_user.id,
+        "Send the **bot username** (without @) to add to the bot verification list.\n"
+        "<blockquote>Eg: `MyBot`</blockquote>",
+        filters=filters.text, timeout=60
+    )
+    try:
+        bot_username = ask.text.strip().lstrip('@')
+        if not bot_username:
+            return await ask.reply("**✗ ɪɴᴠᴀʟɪᴅ ᴜsᴇʀɴᴀᴍᴇ.**")
+        if bot_username in client.bot_verify_dict:
+            return await ask.reply(f"**✗ `@{bot_username}` ɪs ᴀʟʀᴇᴀᴅʏ ɪɴ ᴛʜᴇ ʟɪsᴛ!**")
+        try:
+            chat = await client.get_chat(bot_username)
+            bot_name = chat.first_name or chat.title or bot_username
+        except Exception:
+            bot_name = bot_username
+        client.bot_verify_dict[bot_username] = bot_name
+        await client.mongodb.add_bot_verify(bot_username, bot_name)
+        await ask.reply(f"**✓ `@{bot_username}` (`{bot_name}`) ᴀᴅᴅᴇᴅ ᴛᴏ ʙᴏᴛ ᴠᴇʀɪғɪᴄᴀᴛɪᴏɴ ʟɪsᴛ!**")
+    except Exception as e:
+        await ask.reply(f"**✗ ᴇʀʀᴏʀ:** `{e}`")
+
+#===============================================================#
+
+@Client.on_message(filters.command('delbot') & filters.private)
+async def delbot_cmd(client: Client, message: Message):
+    if message.from_user.id not in client.admins:
+        return await message.reply("**✗ ᴏɴʟʏ ᴀᴅᴍɪɴs ᴄᴀɴ ᴜsᴇ ᴛʜɪs!**")
+    if not client.bot_verify_dict:
+        return await message.reply("**✗ ɴᴏ ʙᴏᴛs ɪɴ ᴛʜᴇ ᴠᴇʀɪғɪᴄᴀᴛɪᴏɴ ʟɪsᴛ.**")
+    ask = await client.ask(
+        message.from_user.id,
+        "Send the **bot username** (without @) to remove.\n"
+        "<blockquote>Eg: `MyBot`</blockquote>",
+        filters=filters.text, timeout=60
+    )
+    try:
+        bot_username = ask.text.strip().lstrip('@')
+        if bot_username not in client.bot_verify_dict:
+            return await ask.reply(f"**✗ `@{bot_username}` ɪs ɴᴏᴛ ɪɴ ᴛʜᴇ ʟɪsᴛ!**")
+        client.bot_verify_dict.pop(bot_username)
+        await client.mongodb.remove_bot_verify(bot_username)
+        await ask.reply(f"**✓ `@{bot_username}` ʀᴇᴍᴏᴠᴇᴅ ғʀᴏᴍ ʙᴏᴛ ᴠᴇʀɪғɪᴄᴀᴛɪᴏɴ ʟɪsᴛ!**")
+    except Exception as e:
+        await ask.reply(f"**✗ ᴇʀʀᴏʀ:** `{e}`")
+
+#===============================================================#
+
+@Client.on_message(filters.command('listbots') & filters.private)
+async def listbots_cmd(client: Client, message: Message):
+    if message.from_user.id not in client.admins:
+        return await message.reply("**✗ ᴏɴʟʏ ᴀᴅᴍɪɴs ᴄᴀɴ ᴜsᴇ ᴛʜɪs!**")
+    mode = getattr(client, 'botverify_mode', 'channel_only')
+    mode_label = VALID_MODES.get(mode, mode)
+    if not client.bot_verify_dict:
+        bot_list = "_ɴᴏ ʙᴏᴛs ᴄᴏɴғɪɢᴜʀᴇᴅ_"
+    else:
+        bot_list = "\n".join(
+            f"• `{name}` (@{uname})"
+            for uname, name in client.bot_verify_dict.items()
+        )
+    await message.reply(
+        f"<blockquote>**ʙᴏᴛ ᴠᴇʀɪғɪᴄᴀᴛɪᴏɴ ʟɪsᴛ**</blockquote>\n"
+        f"**ᴍᴏᴅᴇ:** `{mode_label}`\n\n"
+        f"{bot_list}"
+    )
+
+#===============================================================#
+
+@Client.on_message(filters.command('botverify_mode') & filters.private)
+async def botverify_mode_cmd(client: Client, message: Message):
+    if message.from_user.id not in client.admins:
+        return await message.reply("**✗ ᴏɴʟʏ ᴀᴅᴍɪɴs ᴄᴀɴ ᴜsᴇ ᴛʜɪs!**")
+    current = getattr(client, 'botverify_mode', 'channel_only')
+    modes_text = "\n".join(f"• `{k}` — {v}" for k, v in VALID_MODES.items())
+    ask = await client.ask(
+        message.from_user.id,
+        f"**ᴄᴜʀʀᴇɴᴛ ᴍᴏᴅᴇ:** `{current}`\n\n"
+        f"**ᴀᴠᴀɪʟᴀʙʟᴇ ᴍᴏᴅᴇs:**\n{modes_text}\n\n"
+        "Send the mode key to switch to it.",
+        filters=filters.text, timeout=60
+    )
+    try:
+        new_mode = ask.text.strip().lower()
+        if new_mode not in VALID_MODES:
+            return await ask.reply(
+                f"**✗ ɪɴᴠᴀʟɪᴅ ᴍᴏᴅᴇ.** ᴄʜᴏᴏsᴇ: `{'` | `'.join(VALID_MODES)}`"
+            )
+        client.botverify_mode = new_mode
+        await client.mongodb.set_botverify_mode(new_mode)
+        await ask.reply(f"**✓ ᴍᴏᴅᴇ sᴇᴛ ᴛᴏ `{new_mode}` ({VALID_MODES[new_mode]})**")
+    except Exception as e:
+        await ask.reply(f"**✗ ᴇʀʀᴏʀ:** `{e}`")
+
+#===============================================================#
+
+@Client.on_callback_query(filters.regex('^bverify$'))
+async def bot_verify_callback(client: Client, query: CallbackQuery):
+    """Mark all required bots as verified for the user (trust-based)."""
+    user_id = query.from_user.id
+    bot_verify_dict = getattr(client, 'bot_verify_dict', {})
+    if not bot_verify_dict:
+        return await query.answer("ɴᴏ ʙᴏᴛs ᴛᴏ ᴠᴇʀɪғʏ.", show_alert=True)
+    for bot_username in bot_verify_dict:
+        await client.mongodb.set_user_bot_verified(user_id, bot_username)
+    await query.answer(
+        "✅ ᴠᴇʀɪғɪᴇᴅ! ɴᴏᴡ ᴄʟɪᴄᴋ '🔄 Try Again' ᴛᴏ ɢᴇᴛ ʏᴏᴜʀ ғɪʟᴇs.",
+        show_alert=True
+    )
