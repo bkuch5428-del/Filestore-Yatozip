@@ -5,6 +5,7 @@ from plugins import web_server
 
 from pyrogram import Client
 from pyrogram.enums import ParseMode
+from pyrogram.types import BotCommand
 import sys
 from datetime import datetime
 from config import LOGGER, PORT, OWNER_ID, SHORT_URL, SHORT_API, SHORT_TUT
@@ -163,7 +164,28 @@ class Bot(Client):
             self.LOGGER(__name__, self.name).info("\nBot Stopped. Join https://t.me/animes_cruise for support")
             sys.exit()
         self.LOGGER(__name__, self.name).info("Bot Started!!")
-        
+
+        await self.set_bot_commands([
+            BotCommand("start", "Start the bot"),
+            BotCommand("stats", "View system stats"),
+            BotCommand("broadcast", "Broadcast a message"),
+            BotCommand("pbroadcast", "Broadcast to premium users"),
+            BotCommand("users", "Get total user count"),
+            BotCommand("ban", "Ban users"),
+            BotCommand("unban", "Unban users"),
+            BotCommand("addpremium", "Add a premium user"),
+            BotCommand("delpremium", "Remove a premium user"),
+            BotCommand("premiumusers", "List premium users"),
+            BotCommand("shortner", "Manage URL shortener"),
+            BotCommand("db", "Manage database channels"),
+            BotCommand("adddb", "Quick add DB channel"),
+            BotCommand("removedb", "Quick remove DB channel"),
+            BotCommand("addbot", "Add bot to verification list"),
+            BotCommand("delbot", "Remove bot from verification list"),
+            BotCommand("listbots", "List verified bots"),
+            BotCommand("botverify_mode", "Set bot verification mode"),
+        ])
+
         # Send restart msge to owner
         try:
             restart_message = "<b>›› ʜᴇʏ sᴇɴᴘᴀɪ!!\n ɪ'ᴍ ᴀʟɪᴠᴇ ɴᴏᴡ 🍃...</b>"
